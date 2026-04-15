@@ -163,6 +163,11 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
 .game-over.p2 h1 { color: #d94a5a; }
 .game-over p { color: #aaa; margin-bottom: 24px; }
 
+/* Rules link */
+.rules-link { font-size: 0.85em; text-align: center; margin-bottom: 8px; }
+.rules-link a { color: #888; text-decoration: none; transition: color 0.2s; }
+.rules-link a:hover { color: #ccc; text-decoration: underline; }
+
 /* Battle header */
 .battle-header { text-align: center; margin-bottom: 12px; }
 .battle-header h2 { font-size: 1.4em; color: #aaa; }
@@ -658,6 +663,7 @@ function render() {
       <span class="score-item p2">Player 2: ${game.p2.casualties >= 6 ? 'Defeated' : remaining(game.p2) + ' meeples'}</span>
     </div>
     <h2>Battle <span class="battle-num">#${game.battleNumber}</span></h2>
+    <div class="rules-link"><a href="../MeepleMeleeRules.pdf" target="_blank">Rules (PDF)</a></div>
   </div>`;
 
   if (game.phase === 'battle-start') {
@@ -734,6 +740,7 @@ function renderSetup() {
       </div>
     </div>
     <button class="start-btn" onclick="newGame(window._p1Type||'human', window._p2Type||'ai'); render()">Start Game</button>
+    <div class="rules-link" style="margin-top:24px"><a href="../MeepleMeleeRules.pdf" target="_blank">Read the Rules (PDF)</a></div>
   </div>`;
 }
 
