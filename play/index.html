@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Meeple Melee</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+#app { width: 100%; min-height: 100vh; padding: 16px; position: relative; }
+
+/* Layout: main content + sidebar */
+.game-layout { display: flex; gap: 16px; max-width: 1200px; margin: 0 auto; }
+.game-main { flex: 1; min-width: 0; }
+.game-sidebar { width: 260px; flex-shrink: 0; }
+
+/* Setup Screen */
+.setup { text-align: center; padding-top: 10vh; max-width: 600px; margin: 0 auto; }
+.setup h1 { font-size: 3em; margin-bottom: 8px; background: linear-gradient(135deg, #4a90d9, #d94a5a); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+.setup .subtitle { color: #888; margin-bottom: 40px; font-size: 1.1em; }
+.setup-row { display: flex; justify-content: center; gap: 40px; margin-bottom: 32px; }
+.setup-player { background: #16213e; border-radius: 12px; padding: 24px 32px; min-width: 200px; }
+.setup-player h3 { margin-bottom: 12px; }
+.setup-player.p1 h3 { color: #4a90d9; }
+.setup-player.p2 h3 { color: #d94a5a; }
+.toggle-btn { background: #0f3460; border: 2px solid #4a90d9; color: #4a90d9; padding: 10px 24px; border-radius: 8px; cursor: pointer; font-size: 1em; transition: all 0.2s; }
+.toggle-btn:hover { background: #4a90d9; color: #fff; }
+.toggle-btn.ai { border-color: #e94560; color: #e94560; }
+.toggle-btn.ai:hover { background: #e94560; color: #fff; }
+.start-btn { background: linear-gradient(135deg, #4a90d9, #e94560); border: none; color: #fff; padding: 14px 48px; border-radius: 10px; cursor: pointer; font-size: 1.2em; font-weight: bold; transition: transform 0.2s, box-shadow 0.2s; }
+.start-btn:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(74,144,217,0.4); }
+
+/* Player Area */
+.player-area { background: #16213e; border-radius: 12px; padding: 16px; position: relative; margin-bottom: 12px; }
+.player-area.p1 { border: 2px solid #4a90d933; }
+.player-area.p2 { border: 2px solid #d94a5a33; }
+.player-area.active.p1 { border-color: #4a90d9; box-shadow: 0 0 15px #4a90d933; }
+.player-area.active.p2 { border-color: #d94a5a; box-shadow: 0 0 15px #d94a5a33; }
+.player-area.battle-win { border-color: #4caf50; box-shadow: 0 0 15px #4caf5044; }
+.player-area.battle-lose { border-color: #f44336; box-shadow: 0 0 15px #f4433644; }
+.player-area.battle-draw { border-color: #ffa726; box-shadow: 0 0 15px #ffa72644; }
+.player-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.player-name { font-weight: bold; font-size: 1.1em; }
+.player-name.p1 { color: #4a90d9; }
+.player-name.p2 { color: #d94a5a; }
+.player-info { font-size: 0.85em; color: #888; }
+.player-hidden { text-align: center; padding: 30px; color: #555; font-style: italic; font-size: 1.1em; }
+
+/* Meeple Grid */
+.meeple-grid { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; min-height: 70px; align-items: flex-end; }
+.meeple-slot { width: 80px; height: 90px; display: flex; flex-direction: column; align-items: center; justify-content: center; border-radius: 8px; cursor: default; transition: all 0.2s; position: relative; border: 2px solid transparent; }
+.meeple-slot.selectable { cursor: pointer; }
+.meeple-slot.selectable:hover { background: #ffffff15; }
+.meeple-slot.selected { background: #ffffff20; border-color: #ffd700; }
+.meeple-slot.dimmed { opacity: 0.3; }
+.meeple-label { font-size: 0.65em; margin-top: 2px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: bold; }
+.meeple-label.sweep { color: #8bc34a; }
+.meeple-label.kick { color: #ff9800; }
+.meeple-label.punch { color: #f44336; }
+
+/* Meeple images */
+.meeple-img { width: 56px; height: 56px; object-fit: contain; transition: transform 0.3s; pointer-events: none; }
+.meeple-slot.selected .meeple-img { transform: scale(1.1); }
+.meeple-slot.p1 .meeple-img { filter: sepia(1) saturate(3) hue-rotate(185deg) brightness(1.1); }
+.meeple-slot.p2 .meeple-img { filter: sepia(1) saturate(3) hue-rotate(320deg) brightness(0.9); }
+
+/* Check highlight during resolution */
+.meeple-slot.check-highlight { border-color: #ffd700; background: #ffd70015; box-shadow: 0 0 8px #ffd70044; }
+.meeple-slot.check-dimmed { opacity: 0.35; }
+
+/* Center Track */
+.center-track { background: #16213e; border-radius: 12px; padding: 16px; display: flex; gap: 16px; align-items: stretch; margin-bottom: 12px; }
+.casualty-section { flex: 1; }
+.casualty-section h4 { text-align: center; margin-bottom: 8px; font-size: 0.85em; color: #888; letter-spacing: 1px; text-transform: uppercase; }
+.casualty-row { display: flex; gap: 4px; justify-content: center; align-items: center; margin-bottom: 4px; }
+.casualty-slot { width: 36px; height: 36px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 0.7em; font-weight: bold; }
+.casualty-slot.empty { background: #0f346033; border: 1px dashed #333; }
+.casualty-slot.filled.p1 { background: #4a90d944; border: 1px solid #4a90d9; }
+.casualty-slot.filled.p2 { background: #d94a5a44; border: 1px solid #d94a5a; }
+.pick-row { display: flex; gap: 4px; justify-content: center; align-items: center; }
+.pick-slot { width: 36px; height: 20px; display: flex; align-items: center; justify-content: center; font-size: 0.65em; color: #666; }
+.neutral-section { min-width: 100px; text-align: center; border-left: 1px solid #333; padding-left: 16px; }
+.neutral-section h4 { margin-bottom: 8px; font-size: 0.85em; color: #888; letter-spacing: 1px; text-transform: uppercase; }
+.nz-counts { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.nz-count { font-size: 0.9em; display: flex; align-items: center; gap: 6px; }
+
+/* Actions Bar */
+.actions-bar { background: #16213e; border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+.actions-top { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
+.actions-tokens { display: flex; gap: 6px; align-items: center; }
+.action-token { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 0.85em; transition: all 0.3s; }
+.action-token.available { background: #ffd700; color: #1a1a2e; box-shadow: 0 0 10px #ffd70066; }
+.action-token.used { background: #333; color: #666; }
+@keyframes tokenPulse {
+  0% { transform: scale(0.3); opacity: 0; box-shadow: 0 0 30px #ffd700; }
+  50% { transform: scale(1.3); box-shadow: 0 0 20px #ffd700; }
+  100% { transform: scale(1); box-shadow: 0 0 10px #ffd70066; }
+}
+.actions-info { font-size: 0.9em; color: #aaa; flex: 1; }
+.actions-info strong { color: #e0e0e0; }
+.pick-preview { font-size: 0.85em; color: #ffa726; margin-top: 2px; }
+.actions-buttons { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.action-btn { padding: 8px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 0.9em; font-weight: 600; transition: all 0.2s; }
+.action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.action-btn.reroll { background: #0f3460; color: #4fc3f7; border: 1px solid #4fc3f7; }
+.action-btn.reroll:hover:not(:disabled) { background: #4fc3f7; color: #0f3460; }
+.action-btn.reposition { background: #0f3460; color: #ffa726; border: 1px solid #ffa726; }
+.action-btn.reposition:hover:not(:disabled) { background: #ffa726; color: #0f3460; }
+.action-btn.done { background: #2e7d32; color: #fff; }
+.action-btn.done:hover { background: #388e3c; }
+.action-btn.confirm { background: #1565c0; color: #fff; }
+.action-btn.confirm:hover:not(:disabled) { background: #1976d2; }
+
+/* Reposition Picker */
+.reposition-picker { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.reposition-picker span { font-size: 0.85em; color: #aaa; }
+.orientation-btn { width: 72px; height: 72px; border-radius: 8px; border: 2px solid #555; background: #0f3460; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; transition: all 0.2s; gap: 2px; }
+.orientation-btn:hover { border-color: #fff; background: #1a4a80; }
+.orientation-btn img { width: 40px; height: 40px; object-fit: contain; }
+.orientation-btn .orient-label { font-size: 0.6em; text-transform: uppercase; letter-spacing: 0.5px; }
+
+/* Sidebar: Rules Reference */
+.rules-ref { background: #16213e; border-radius: 12px; padding: 16px; position: sticky; top: 16px; }
+.rules-ref h3 { font-size: 1em; color: #aaa; margin-bottom: 12px; text-align: center; text-transform: uppercase; letter-spacing: 1px; }
+.rule-step { padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; border: 2px solid transparent; transition: all 0.3s; }
+.rule-step.checking { border-color: #ffd700; background: #ffd70011; }
+.rule-step.passed { border-color: #66666644; opacity: 0.5; }
+.rule-step.decisive { border-color: #4caf50; background: #4caf5022; }
+.rule-step.pending { opacity: 0.3; }
+.rule-step .rule-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.rule-step .rule-icon { width: 28px; height: 28px; object-fit: contain; }
+.rule-step .rule-name { font-weight: bold; font-size: 0.95em; }
+.rule-step .rule-name.sweep { color: #8bc34a; }
+.rule-step .rule-name.kick { color: #ff9800; }
+.rule-step .rule-name.punch { color: #f44336; }
+.rule-step .rule-detail { font-size: 0.8em; color: #999; }
+.rule-step .rule-result { font-size: 0.85em; margin-top: 4px; font-weight: 600; }
+.rule-step .rule-result.win { color: #4caf50; }
+.rule-step .rule-result.no { color: #777; }
+.rule-draw { text-align: center; padding: 8px; border-radius: 8px; font-size: 0.85em; color: #777; border: 2px solid transparent; margin-top: 4px; }
+.rule-draw.checking { border-color: #ffa726; background: #ffa72611; color: #ffa726; }
+.rule-draw.pending { opacity: 0.3; }
+
+/* Reveal */
+.reveal-area { background: #16213e; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 12px; }
+.reveal-result { font-size: 1.4em; font-weight: bold; margin-bottom: 8px; }
+.reveal-result.p1win { color: #4a90d9; }
+.reveal-result.p2win { color: #d94a5a; }
+.reveal-result.draw { color: #ffa726; }
+
+/* Overlay */
+.overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a2eee; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 100; }
+.overlay h2 { font-size: 2em; margin-bottom: 16px; }
+.overlay p { color: #aaa; margin-bottom: 24px; font-size: 1.1em; }
+.overlay .start-btn { margin-top: 8px; }
+.overlay.p1 h2 { color: #4a90d9; }
+.overlay.p2 h2 { color: #d94a5a; }
+
+/* Game Over */
+.game-over { text-align: center; padding-top: 15vh; }
+.game-over h1 { font-size: 2.5em; margin-bottom: 16px; }
+.game-over.p1 h1 { color: #4a90d9; }
+.game-over.p2 h1 { color: #d94a5a; }
+.game-over p { color: #aaa; margin-bottom: 24px; }
+
+/* Battle header */
+.battle-header { text-align: center; margin-bottom: 12px; }
+.battle-header h2 { font-size: 1.4em; color: #aaa; }
+.battle-header .battle-num { color: #fff; }
+.score-display { display: flex; justify-content: center; gap: 24px; margin-bottom: 4px; }
+.score-item { font-size: 0.9em; }
+.score-item.p1 { color: #4a90d9; }
+.score-item.p2 { color: #d94a5a; }
+
+/* Rolling animation */
+@keyframes shake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-3px) rotate(-5deg); }
+  75% { transform: translateX(3px) rotate(5deg); }
+}
+.rolling .meeple-img { animation: shake 0.15s infinite; }
+.meeple-slot.rerolling .meeple-img { animation: shake 0.15s infinite; }
+
+.phase-label { text-align: center; padding: 8px; font-size: 0.95em; color: #ccc; background: #0f346066; border-radius: 8px; margin-bottom: 12px; }
+
+/* Responsive */
+@media (max-width: 800px) {
+  .game-layout { flex-direction: column; }
+  .game-sidebar { width: 100%; }
+  .rules-ref { position: static; }
+  .setup-row { flex-direction: column; align-items: center; gap: 16px; }
+  .center-track { flex-direction: column; }
+  .neutral-section { border-left: none; border-top: 1px solid #333; padding-left: 0; padding-top: 12px; }
+  .meeple-slot { width: 65px; height: 75px; }
+  .meeple-img { width: 44px; height: 44px; }
+  .casualty-slot { width: 30px; height: 30px; }
+}
+
+.mini-meeple { width: 20px; height: 20px; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ============================================================
+// CONSTANTS
+// ============================================================
+const SWEEP = 'sweep', KICK = 'kick', PUNCH = 'punch';
+const ORIENTATIONS = [SWEEP, KICK, PUNCH];
+const ACTIONS_TABLE = [1, 1, 2, 2, 3, 3];
+const PICK_TABLE    = [6, 5, 5, 4, 4, 3];
+const MEEPLE_PATH = "M 0,-9 C -3,-9 -5,-7 -5,-4.5 C -5,-2.5 -3.5,-1 -1.5,-0.5 L -6,7 C -6,8.5 -5,9 -4,9 L -1,9 L -1,5.5 C -1,4.5 1,4.5 1,5.5 L 1,9 L 4,9 C 5,9 6,8.5 6,7 L 1.5,-0.5 C 3.5,-1 5,-2.5 5,-4.5 C 5,-7 3,-9 0,-9 Z";
+const ORIENTATION_LABELS = { sweep: 'Sweep', kick: 'Kick', punch: 'Punch' };
+const ORIENTATION_IMAGES = { sweep: 'sweep.png', kick: 'kick.png', punch: 'punch.png' };
+const THRESHOLDS = { sweep: 3, kick: 2, punch: 1 };
+
+function miniMeepleSvg(color) {
+  return `<svg class="mini-meeple" viewBox="-10 -12 20 24"><path d="${MEEPLE_PATH}" fill="${color}"/></svg>`;
+}
+
+// ============================================================
+// GAME STATE
+// ============================================================
+let game = null;
+
+function newGame(p1Type, p2Type) {
+  game = {
+    p1: { type: p1Type, casualties: 0, neutralZone: 0, meeples: [], picks: [] },
+    p2: { type: p2Type, casualties: 0, neutralZone: 0, meeples: [], picks: [] },
+    phase: 'battle-start',
+    currentPlayer: null,
+    actionsRemaining: 0,
+    totalActions: 0,
+    battleNumber: 1,
+    selectedIndices: new Set(),
+    repositionIndex: null,
+    overlay: null,
+    winner: null,
+    battleResult: null,
+    prevP1Actions: 1,
+    prevP2Actions: 1,
+    resolveStep: -1,       // -1=not resolving, 0=sweep, 1=kick, 2=punch, 3=done
+    resolveTimer: null,
+    rerollingIndices: null, // set of indices being rerolled (for animation)
+  };
+}
+
+function getPlayer(id) { return game[id]; }
+function otherPlayer(id) { return id === 'p1' ? 'p2' : 'p1'; }
+function playerName(id) { return id === 'p1' ? 'Player 1' : 'Player 2'; }
+function playerColor(id) { return id === 'p1' ? '#4a90d9' : '#d94a5a'; }
+function remaining(p) { return 8 - p.casualties - p.neutralZone; }
+function getActions(p) { return p.casualties >= 6 ? 0 : ACTIONS_TABLE[p.casualties]; }
+function getPickCount() {
+  const maxCas = Math.max(game.p1.casualties, game.p2.casualties);
+  return maxCas >= 6 ? 0 : PICK_TABLE[maxCas];
+}
+
+function sortMeeples(meeples) {
+  const order = { sweep: 0, kick: 1, punch: 2 };
+  return [...meeples].sort((a, b) => order[a] - order[b]);
+}
+
+// ============================================================
+// ROLLING
+// ============================================================
+function rollMeeple() {
+  const r = Math.random();
+  if (r < 0.5) return SWEEP;
+  if (r < 0.833) return KICK;
+  return PUNCH;
+}
+
+function rollMeeples(count) {
+  return sortMeeples(Array.from({ length: count }, rollMeeple));
+}
+
+// ============================================================
+// BATTLE RESOLUTION
+// ============================================================
+function countOrientations(picks) {
+  const c = { sweep: 0, kick: 0, punch: 0 };
+  picks.forEach(o => c[o]++);
+  return c;
+}
+
+function resolveBattle(p1picks, p2picks) {
+  const c1 = countOrientations(p1picks);
+  const c2 = countOrientations(p2picks);
+  const checks = [];
+
+  for (const [type, threshold] of [[SWEEP, 3], [KICK, 2], [PUNCH, 1]]) {
+    const diff = c1[type] - c2[type];
+    if (Math.abs(diff) >= threshold) {
+      checks.push({ type, decisive: true, winner: diff > 0 ? 'p1' : 'p2', diff: Math.abs(diff) });
+      return { winner: diff > 0 ? 'p1' : 'p2', checks, c1, c2 };
+    }
+    checks.push({ type, decisive: false, diff: Math.abs(diff) });
+  }
+  return { winner: null, checks, c1, c2 };
+}
+
+function applyBattleResult(result) {
+  game.prevP1Actions = getActions(game.p1);
+  game.prevP2Actions = getActions(game.p2);
+  const winner = result.winner;
+  if (winner) {
+    const loser = otherPlayer(winner);
+    const lp = getPlayer(loser);
+    const wp = getPlayer(winner);
+    const nzLoss = lp.neutralZone;
+    lp.casualties += 1 + nzLoss;
+    lp.neutralZone = 0;
+    wp.neutralZone = 0;
+    if (lp.casualties >= 6) { lp.casualties = 6; game.winner = winner; }
+  } else {
+    game.p1.neutralZone++;
+    game.p2.neutralZone++;
+    if (remaining(game.p1) <= 0) { game.p1.casualties = 6; game.winner = 'p2'; }
+    if (remaining(game.p2) <= 0) { game.p2.casualties = 6; game.winner = 'p1'; }
+  }
+}
+
+// ============================================================
+// AI LOGIC
+// ============================================================
+function aiTakeActions(meeples, actionsLeft) {
+  let m = [...meeples];
+  for (let a = 0; a < actionsLeft; a++) {
+    const counts = countOrientations(m);
+    if (counts.punch === 0 && counts.sweep > 0) {
+      const idx = m.indexOf(SWEEP);
+      if (idx >= 0) m[idx] = PUNCH;
+    } else if (counts.punch > 0 && counts.punch < m.length) {
+      const nonPunchCount = m.length - counts.punch;
+      if (nonPunchCount >= 3) {
+        for (let i = 0; i < m.length; i++) { if (m[i] !== PUNCH) m[i] = rollMeeple(); }
+      } else {
+        const idx = m.findIndex(x => x !== PUNCH);
+        if (idx >= 0) m[idx] = PUNCH;
+      }
+    } else if (counts.kick >= 2) {
+      const idx = m.findIndex(x => x === SWEEP);
+      if (idx >= 0) m[idx] = KICK;
+    } else {
+      if (counts.sweep >= 4) {
+        const idx = m.findIndex(x => x !== SWEEP);
+        if (idx >= 0) m[idx] = SWEEP;
+      } else {
+        for (let i = 0; i < m.length; i++) m[i] = rollMeeple();
+      }
+    }
+  }
+  return sortMeeples(m);
+}
+
+function aiPickMeeples(meeples, pickCount) {
+  if (pickCount >= meeples.length) return [...Array(meeples.length).keys()];
+  if (meeples.length <= 8 && pickCount <= 6) return aiBestPick(meeples, pickCount);
+  const scored = meeples.map((o, i) => ({ idx: i, score: o === PUNCH ? 6 : o === KICK ? 3 : 1 }));
+  scored.sort((a, b) => b.score - a.score);
+  return scored.slice(0, pickCount).map(s => s.idx).sort((a, b) => a - b);
+}
+
+function aiBestPick(meeples, pickCount) {
+  const combos = combinations(meeples.length, pickCount);
+  let bestScore = -Infinity, bestCombo = combos[0];
+  for (const combo of combos) {
+    const score = evaluatePicks(combo.map(i => meeples[i]));
+    if (score > bestScore) { bestScore = score; bestCombo = combo; }
+  }
+  return bestCombo;
+}
+
+function evaluatePicks(picks) {
+  const c = countOrientations(picks);
+  let score = c.punch * 6 + c.kick * 2.5 + c.sweep * 0.8;
+  if (c.punch >= 2) score += 10;
+  if (c.kick >= 3) score += 8;
+  if (c.sweep >= 4) score += 6;
+  return score;
+}
+
+function combinations(n, k) {
+  const result = [], combo = [];
+  function gen(start) {
+    if (combo.length === k) { result.push([...combo]); return; }
+    for (let i = start; i < n; i++) { combo.push(i); gen(i + 1); combo.pop(); }
+  }
+  gen(0);
+  return result;
+}
+
+// ============================================================
+// GAME FLOW
+// ============================================================
+function startBattle() {
+  const p1 = game.p1, p2 = game.p2;
+  p1.meeples = rollMeeples(remaining(p1));
+  p2.meeples = rollMeeples(remaining(p2));
+  p1.picks = [];
+  p2.picks = [];
+  game.selectedIndices = new Set();
+  game.repositionIndex = null;
+  game.rerollingIndices = null;
+  game.phase = 'rolling';
+  render();
+  setTimeout(() => { beginPlayerTurn('p1'); }, 800);
+}
+
+function beginPlayerTurn(pid) {
+  const p = getPlayer(pid);
+  game.currentPlayer = pid;
+  game.selectedIndices = new Set();
+  game.repositionIndex = null;
+  game.rerollingIndices = null;
+  const actions = getActions(p);
+  game.actionsRemaining = actions;
+  game.totalActions = actions;
+
+  if (p.type === 'ai') {
+    game.phase = 'action';
+    render();
+    setTimeout(() => {
+      p.meeples = aiTakeActions(p.meeples, game.actionsRemaining);
+      game.actionsRemaining = 0;
+      const pickCount = Math.min(getPickCount(), p.meeples.length);
+      if (pickCount >= p.meeples.length) {
+        p.picks = [...p.meeples];
+        finishPlayerTurn(pid);
+      } else {
+        game.phase = 'pick';
+        render();
+        setTimeout(() => {
+          const indices = aiPickMeeples(p.meeples, pickCount);
+          p.picks = indices.map(i => p.meeples[i]);
+          finishPlayerTurn(pid);
+        }, 400);
+      }
+    }, 600);
+  } else {
+    // Human player: skip action phase if 0 actions
+    if (actions === 0) {
+      advanceToPick(pid);
+    } else {
+      game.phase = 'action';
+      if (game.p1.type === 'human' && game.p2.type === 'human') {
+        game.overlay = { type: 'handoff', player: pid };
+      }
+      render();
+    }
+  }
+}
+
+function advanceToPick(pid) {
+  const p = getPlayer(pid);
+  game.selectedIndices = new Set();
+  game.repositionIndex = null;
+  const pickCount = Math.min(getPickCount(), p.meeples.length);
+  if (pickCount >= p.meeples.length) {
+    p.picks = [...p.meeples];
+    finishPlayerTurn(pid);
+  } else {
+    game.phase = 'pick';
+    if (game.p1.type === 'human' && game.p2.type === 'human' && game.phase !== 'action') {
+      // Only show handoff if we didn't just come from action phase
+      if (!game.overlay) {
+        game.overlay = { type: 'handoff', player: pid };
+      }
+    }
+    render();
+  }
+}
+
+function finishPlayerTurn(pid) {
+  if (pid === 'p1') {
+    beginPlayerTurn('p2');
+  } else {
+    // Both done — start resolution automatically
+    game.currentPlayer = null;
+    game.overlay = null;
+    startResolution();
+  }
+}
+
+function startResolution() {
+  const result = resolveBattle(game.p1.picks, game.p2.picks);
+  game.battleResult = result;
+  game.phase = 'resolving';
+  game.resolveStep = -1;
+  render();
+
+  // Start stepping through checks after 1 second
+  setTimeout(() => advanceResolution(), 1000);
+}
+
+function advanceResolution() {
+  if (!game || game.phase !== 'resolving') return;
+  const r = game.battleResult;
+  game.resolveStep++;
+  render();
+
+  // Check if current step is decisive or if we've checked all 3
+  const step = game.resolveStep;
+  if (step < r.checks.length) {
+    const check = r.checks[step];
+    if (check.decisive) {
+      // Decisive — pause then show result
+      setTimeout(() => {
+        game.resolveStep = 3; // done
+        game.phase = 'result';
+        render();
+      }, 1500);
+    } else {
+      // Not decisive — advance to next after 1 second
+      setTimeout(() => advanceResolution(), 1200);
+    }
+  } else {
+    // All checks done, must be a draw
+    game.phase = 'result';
+    render();
+  }
+}
+
+function applyResult() {
+  applyBattleResult(game.battleResult);
+  if (game.winner) {
+    game.phase = 'game-over';
+  } else {
+    game.battleNumber++;
+    game.phase = 'battle-start';
+  }
+  game.battleResult = null;
+  game.resolveStep = -1;
+  render();
+}
+
+// ============================================================
+// USER ACTIONS
+// ============================================================
+function toggleMeepleSelection(idx) {
+  if (game.repositionIndex !== null || game.rerollingIndices) return;
+  if (game.selectedIndices.has(idx)) {
+    game.selectedIndices.delete(idx);
+  } else {
+    game.selectedIndices.add(idx);
+  }
+  render();
+}
+
+function doReroll() {
+  if (game.actionsRemaining <= 0 || game.selectedIndices.size === 0 || game.rerollingIndices) return;
+  // Start rolling animation on selected meeples
+  game.rerollingIndices = new Set(game.selectedIndices);
+  game.selectedIndices = new Set();
+  render();
+
+  // After animation, resolve
+  setTimeout(() => {
+    const p = getPlayer(game.currentPlayer);
+    for (const idx of game.rerollingIndices) p.meeples[idx] = rollMeeple();
+    game.actionsRemaining--;
+    game.rerollingIndices = null;
+    p.meeples = sortMeeples(p.meeples);
+    afterAction();
+  }, 600);
+}
+
+function startReposition() {
+  if (game.actionsRemaining <= 0 || game.selectedIndices.size !== 1 || game.rerollingIndices) return;
+  game.repositionIndex = [...game.selectedIndices][0];
+  game.selectedIndices = new Set();
+  render();
+}
+
+function doReposition(orientation) {
+  if (game.repositionIndex === null) return;
+  const p = getPlayer(game.currentPlayer);
+  p.meeples[game.repositionIndex] = orientation;
+  game.repositionIndex = null;
+  game.actionsRemaining--;
+  p.meeples = sortMeeples(p.meeples);
+  afterAction();
+}
+
+function cancelReposition() {
+  game.repositionIndex = null;
+  render();
+}
+
+function afterAction() {
+  if (game.actionsRemaining <= 0) {
+    // Auto-advance to pick
+    advanceToPick(game.currentPlayer);
+  } else {
+    render();
+  }
+}
+
+function finishActions() {
+  game.actionsRemaining = 0;
+  game.selectedIndices = new Set();
+  game.repositionIndex = null;
+  advanceToPick(game.currentPlayer);
+}
+
+function skipAndConfirm() {
+  const p = getPlayer(game.currentPlayer);
+  const pickCount = Math.min(getPickCount(), p.meeples.length);
+  if (game.selectedIndices.size !== pickCount) return;
+  p.picks = [...game.selectedIndices].map(i => p.meeples[i]);
+  game.selectedIndices = new Set();
+  game.actionsRemaining = 0;
+  game.repositionIndex = null;
+  finishPlayerTurn(game.currentPlayer);
+}
+
+function togglePickSelection(idx) {
+  const p = getPlayer(game.currentPlayer);
+  const pickCount = Math.min(getPickCount(), p.meeples.length);
+  if (game.selectedIndices.has(idx)) {
+    game.selectedIndices.delete(idx);
+  } else if (game.selectedIndices.size < pickCount) {
+    game.selectedIndices.add(idx);
+  }
+  render();
+}
+
+function confirmPick() {
+  const p = getPlayer(game.currentPlayer);
+  const pickCount = Math.min(getPickCount(), p.meeples.length);
+  if (game.selectedIndices.size !== pickCount) return;
+  p.picks = [...game.selectedIndices].map(i => p.meeples[i]);
+  game.selectedIndices = new Set();
+  finishPlayerTurn(game.currentPlayer);
+}
+
+function dismissOverlay() {
+  game.overlay = null;
+  render();
+}
+
+// ============================================================
+// RENDERING
+// ============================================================
+function render() {
+  document.querySelectorAll('.overlay').forEach(el => el.remove());
+  const app = document.getElementById('app');
+
+  if (!game) { app.innerHTML = renderSetup(); return; }
+  if (game.phase === 'game-over') { app.innerHTML = renderGameOver(); return; }
+
+  let html = '';
+
+  html += `<div class="battle-header">
+    <div class="score-display">
+      <span class="score-item p1">Player 1: ${game.p1.casualties >= 6 ? 'Defeated' : remaining(game.p1) + ' meeples'}</span>
+      <span class="score-item p2">Player 2: ${game.p2.casualties >= 6 ? 'Defeated' : remaining(game.p2) + ' meeples'}</span>
+    </div>
+    <h2>Battle <span class="battle-num">#${game.battleNumber}</span></h2>
+  </div>`;
+
+  if (game.phase === 'battle-start') {
+    const p1Actions = getActions(game.p1);
+    const p2Actions = getActions(game.p2);
+    const p1New = p1Actions > (game.prevP1Actions || 1);
+    const p2New = p2Actions > (game.prevP2Actions || 1);
+
+    html += `<div class="game-layout"><div class="game-main">`;
+    html += `<div style="text-align:center; padding: 40px 0;">
+      <p style="color:#aaa; margin-bottom: 8px;">Pick: <strong style="color:#fff">${getPickCount()}</strong> meeples</p>
+      <p style="color:#aaa; margin-bottom: 8px;">
+        P1 actions: <strong style="color:#4a90d9">${p1Actions}</strong>${p1New ? ' <span style="color:#ffd700">(+1 new!)</span>' : ''}
+        &nbsp;&nbsp;|&nbsp;&nbsp;
+        P2 actions: <strong style="color:#d94a5a">${p2Actions}</strong>${p2New ? ' <span style="color:#ffd700">(+1 new!)</span>' : ''}
+      </p>
+      <button class="start-btn" onclick="startBattle()">Fight!</button>
+    </div>`;
+    html += renderCenterTrack();
+    html += `</div><div class="game-sidebar">${renderRulesRef()}</div></div>`;
+    app.innerHTML = html;
+    return;
+  }
+
+  html += `<div class="game-layout"><div class="game-main">`;
+
+  html += renderPlayerArea('p2');
+  html += renderCenterTrack();
+  html += renderPlayerArea('p1');
+
+  // Actions bar (only during action/pick for human)
+  if ((game.phase === 'action' || game.phase === 'pick') && game.currentPlayer) {
+    const p = getPlayer(game.currentPlayer);
+    if (p.type === 'human') html += renderActionsBar();
+  }
+
+  // AI thinking label
+  if (game.currentPlayer && getPlayer(game.currentPlayer).type === 'ai' && (game.phase === 'action' || game.phase === 'pick')) {
+    html += `<div class="phase-label">${playerName(game.currentPlayer)} (AI) is thinking...</div>`;
+  }
+
+  // Resolving label
+  if (game.phase === 'resolving' && game.resolveStep < 0) {
+    html += `<div class="phase-label">Comparing meeples...</div>`;
+  }
+
+  // Result
+  if (game.phase === 'result') html += renderResult();
+
+  html += `</div><div class="game-sidebar">${renderRulesRef()}</div></div>`;
+
+  app.innerHTML = html;
+  if (game.overlay) renderOverlay();
+}
+
+function renderSetup() {
+  return `<div class="setup">
+    <h1>Meeple Melee</h1>
+    <p class="subtitle">A head-to-head meeple combat game</p>
+    <div class="setup-row">
+      <div class="setup-player p1">
+        <h3>Player 1 (Blue)</h3>
+        <button class="toggle-btn ${window._p1Type === 'ai' ? 'ai' : ''}"
+                onclick="window._p1Type = window._p1Type === 'ai' ? 'human' : 'ai'; render()">
+          ${(window._p1Type || 'human') === 'human' ? 'Human' : 'AI'}
+        </button>
+      </div>
+      <div class="setup-player p2">
+        <h3>Player 2 (Red)</h3>
+        <button class="toggle-btn ${window._p2Type === 'ai' ? 'ai' : ''}"
+                onclick="window._p2Type = window._p2Type === 'ai' ? 'human' : 'ai'; render()">
+          ${(window._p2Type || 'ai') === 'human' ? 'Human' : 'AI'}
+        </button>
+      </div>
+    </div>
+    <button class="start-btn" onclick="newGame(window._p1Type||'human', window._p2Type||'ai'); render()">Start Game</button>
+  </div>`;
+}
+
+function renderPlayerArea(pid) {
+  const p = getPlayer(pid);
+  const isActive = game.currentPlayer === pid;
+  const isHidden = !isActive && game.currentPlayer !== null &&
+                   (game.phase === 'action' || game.phase === 'pick' || game.phase === 'rolling');
+  const showPicks = game.phase === 'reveal' || game.phase === 'result' || game.phase === 'resolving';
+
+  // Determine which orientation to highlight during resolution
+  let highlightOrientation = null;
+  if ((game.phase === 'resolving' || game.phase === 'result') && game.resolveStep >= 0 && game.battleResult) {
+    const step = Math.min(game.resolveStep, game.battleResult.checks.length - 1);
+    if (step >= 0 && step < game.battleResult.checks.length) {
+      highlightOrientation = game.battleResult.checks[step].type;
+    }
+  }
+
+  // Battle outcome border
+  let outcomeClass = '';
+  if (game.phase === 'result' && game.battleResult) {
+    const w = game.battleResult.winner;
+    if (w === pid) outcomeClass = 'battle-win';
+    else if (w && w !== pid) outcomeClass = 'battle-lose';
+    else outcomeClass = 'battle-draw';
+  }
+
+  let html = `<div class="player-area ${pid} ${isActive ? 'active' : ''} ${outcomeClass}">`;
+  html += `<div class="player-header">
+    <span class="player-name ${pid}">${playerName(pid)} ${p.type === 'ai' ? '(AI)' : ''}</span>
+    <span class="player-info">Meeples: ${remaining(p)} | Casualties: ${p.casualties}${p.neutralZone > 0 ? ' | NZ: ' + p.neutralZone : ''}</span>
+  </div>`;
+
+  if (showPicks) {
+    html += `<div class="meeple-grid">`;
+    const sorted = sortMeeples(p.picks);
+    for (let i = 0; i < sorted.length; i++) {
+      const isHighlighted = highlightOrientation && sorted[i] === highlightOrientation;
+      const isDimmed = highlightOrientation && sorted[i] !== highlightOrientation;
+      html += renderMeeple(sorted[i], pid, i, false, false, isDimmed, null, isHighlighted);
+    }
+    html += `</div>`;
+  } else if (isHidden) {
+    html += `<div class="player-hidden">Behind screen</div>`;
+  } else if (isActive && (game.phase === 'action' || game.phase === 'pick')) {
+    html += `<div class="meeple-grid">`;
+    for (let i = 0; i < p.meeples.length; i++) {
+      const selectable = p.type === 'human' && !game.rerollingIndices;
+      const selected = game.selectedIndices.has(i) || game.repositionIndex === i;
+      const dimmed = game.repositionIndex !== null && game.repositionIndex !== i;
+      const isRerolling = game.rerollingIndices && game.rerollingIndices.has(i);
+      const clickAction = game.phase === 'action' ? `toggleMeepleSelection(${i})` : `togglePickSelection(${i})`;
+      html += renderMeeple(p.meeples[i], pid, i, selectable, selected, dimmed, clickAction, false, isRerolling);
+    }
+    html += `</div>`;
+  } else if (game.phase === 'rolling') {
+    if (p.type === 'ai') {
+      html += `<div class="meeple-grid rolling">`;
+      for (let i = 0; i < p.meeples.length; i++) {
+        html += renderMeeple(p.meeples[i], pid, i, false, false, false);
+      }
+      html += `</div>`;
+    } else {
+      html += `<div class="player-hidden">Rolling ${p.meeples.length} meeples...</div>`;
+    }
+  } else {
+    html += `<div class="player-hidden" style="color:#444">Waiting...</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function renderMeeple(orientation, pid, idx, selectable, selected, dimmed, clickAction, checkHighlight, rerolling) {
+  const classes = ['meeple-slot', pid];
+  if (selectable) classes.push('selectable');
+  if (selected) classes.push('selected');
+  if (dimmed) classes.push('check-dimmed');
+  if (checkHighlight) classes.push('check-highlight');
+  if (rerolling) classes.push('rerolling');
+
+  return `<div class="${classes.join(' ')}" ${clickAction ? `onclick="${clickAction}"` : ''}>
+    <img class="meeple-img" src="${ORIENTATION_IMAGES[orientation]}" alt="${orientation}">
+    <span class="meeple-label ${orientation}">${ORIENTATION_LABELS[orientation]}</span>
+  </div>`;
+}
+
+function renderCenterTrack() {
+  let html = `<div class="center-track">`;
+  html += `<div class="casualty-section"><h4>Casualty Track</h4>`;
+
+  html += `<div class="casualty-row">`;
+  html += `<div style="width:36px;font-size:0.6em;color:#d94a5a;display:flex;align-items:center;justify-content:center">P2</div>`;
+  for (let i = 0; i < 6; i++) {
+    const filled = i < game.p2.casualties;
+    html += `<div class="casualty-slot ${filled ? 'filled p2' : 'empty'}">
+      ${filled ? miniMeepleSvg('#d94a5a') : '<span style="color:#555">' + ACTIONS_TABLE[i] + '</span>'}
+    </div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="casualty-row">`;
+  html += `<div style="width:36px;font-size:0.6em;color:#4a90d9;display:flex;align-items:center;justify-content:center">P1</div>`;
+  for (let i = 0; i < 6; i++) {
+    const filled = i < game.p1.casualties;
+    html += `<div class="casualty-slot ${filled ? 'filled p1' : 'empty'}">
+      ${filled ? miniMeepleSvg('#4a90d9') : '<span style="color:#555">' + ACTIONS_TABLE[i] + '</span>'}
+    </div>`;
+  }
+  html += `</div>`;
+
+  html += `<div class="pick-row">`;
+  html += `<div style="width:36px;font-size:0.55em;color:#888;display:flex;align-items:center;justify-content:center">Pick</div>`;
+  for (let i = 0; i < 6; i++) {
+    const maxCas = Math.max(game.p1.casualties, game.p2.casualties);
+    const isActive = i === maxCas && maxCas < 6;
+    html += `<div class="pick-slot" ${isActive ? 'style="color:#fff;font-weight:bold"' : ''}>${PICK_TABLE[i]}</div>`;
+  }
+  html += `</div></div>`;
+
+  html += `<div class="neutral-section"><h4>Neutral Zone</h4>
+    <div class="nz-counts">
+      <div class="nz-count">${miniMeepleSvg('#4a90d9')} ${game.p1.neutralZone}</div>
+      <div class="nz-count">${miniMeepleSvg('#d94a5a')} ${game.p2.neutralZone}</div>
+    </div></div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function renderActionsBar() {
+  const pid = game.currentPlayer;
+  const p = getPlayer(pid);
+  const pickCount = Math.min(getPickCount(), p.meeples.length);
+
+  let html = `<div class="actions-bar">`;
+
+  if (game.phase === 'action') {
+    html += `<div class="actions-top">`;
+    html += `<div class="actions-tokens">`;
+    for (let i = 0; i < game.totalActions; i++) {
+      const available = i < game.actionsRemaining;
+      html += `<div class="action-token ${available ? 'available' : 'used'}">${available ? '!' : ''}</div>`;
+    }
+    html += `</div>`;
+    html += `<div class="actions-info">
+      <div><strong>${playerName(pid)}</strong> &mdash; ${game.actionsRemaining} action${game.actionsRemaining !== 1 ? 's' : ''} remaining</div>
+      <div class="pick-preview">After actions, you will pick ${pickCount} of ${p.meeples.length} meeples</div>
+    </div></div>`;
+
+    html += `<div class="actions-buttons">`;
+    if (game.repositionIndex !== null) {
+      html += `<div class="reposition-picker"><span>Set to:</span>`;
+      for (const o of ORIENTATIONS) {
+        html += `<button class="orientation-btn" onclick="doReposition('${o}')">
+          <img src="${ORIENTATION_IMAGES[o]}" alt="${o}" style="width:40px;height:40px;object-fit:contain">
+          <span class="orient-label">${ORIENTATION_LABELS[o]}</span>
+        </button>`;
+      }
+      html += `<button class="action-btn done" onclick="cancelReposition()" style="padding:6px 12px">Cancel</button></div>`;
+    } else if (!game.rerollingIndices) {
+      const sel = game.selectedIndices.size;
+      html += `<button class="action-btn reroll" ${sel === 0 ? 'disabled' : ''} onclick="doReroll()">Reroll${sel > 0 ? ' (' + sel + ')' : ''}</button>`;
+      html += `<button class="action-btn reposition" ${sel !== 1 ? 'disabled' : ''} onclick="startReposition()">Reposition${sel === 1 ? '' : ' (select 1)'}</button>`;
+      if (sel === pickCount) {
+        html += `<button class="action-btn confirm" onclick="skipAndConfirm()">Skip Actions, Confirm Selection</button>`;
+      }
+      html += `<button class="action-btn done" onclick="finishActions()">Skip Actions</button>`;
+    }
+    html += `</div>`;
+  } else if (game.phase === 'pick') {
+    const selected = game.selectedIndices.size;
+    html += `<div class="actions-top">`;
+    html += `<div class="actions-info">
+      <div><strong>${playerName(pid)}</strong> &mdash; Pick <strong>${pickCount}</strong> meeples to keep (${selected}/${pickCount} selected)</div>
+      <div class="pick-preview">${p.meeples.length - pickCount} meeple${p.meeples.length - pickCount !== 1 ? 's' : ''} will be set aside</div>
+    </div></div>`;
+    html += `<div class="actions-buttons">`;
+    html += `<button class="action-btn confirm" ${selected !== pickCount ? 'disabled' : ''} onclick="confirmPick()">Confirm Selection</button>`;
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function renderRulesRef() {
+  const isResolving = game.phase === 'resolving' || game.phase === 'result';
+  const r = game.battleResult;
+  const step = game.resolveStep;
+
+  let html = `<div class="rules-ref"><h3>Battle Resolution</h3>`;
+
+  const orientations = [
+    { type: SWEEP, name: 'Sweep', cls: 'sweep', img: 'sweep.png', need: 3 },
+    { type: KICK, name: 'Kick', cls: 'kick', img: 'kick.png', need: 2 },
+    { type: PUNCH, name: 'Punch', cls: 'punch', img: 'punch.png', need: 1 },
+  ];
+
+  for (let i = 0; i < orientations.length; i++) {
+    const o = orientations[i];
+    const check = r ? r.checks.find(c => c.type === o.type) : null;
+
+    let cls = '';
+    if (isResolving && step >= 0) {
+      if (i < step || (i < step && check && !check.decisive)) {
+        // Already checked, not decisive
+        cls = check?.decisive ? 'decisive' : 'passed';
+      } else if (i === step) {
+        cls = check?.decisive ? 'decisive' : 'checking';
+      } else {
+        // Not yet checked
+        const prevDecisive = r && r.checks.slice(0, i).some(c => c.decisive);
+        cls = prevDecisive ? '' : 'pending';
+      }
+      // If a previous step was decisive, dim this one
+      if (i > 0 && r) {
+        const prevDecisive = r.checks.slice(0, i).some(c => c.decisive);
+        if (prevDecisive && !check?.decisive) cls = '';
+      }
+    }
+
+    // Simplified: compute class based on state
+    if (isResolving && step >= 0 && r) {
+      const prevDecisive = r.checks.slice(0, i).some(c => c.decisive);
+      if (prevDecisive) {
+        cls = 'pending'; // greyed out, earlier step was decisive
+      } else if (i < step || (i === step && game.phase === 'result')) {
+        cls = check?.decisive ? 'decisive' : 'passed';
+      } else if (i === step) {
+        cls = 'checking';
+      } else {
+        cls = 'pending';
+      }
+    }
+
+    const showResult = isResolving && check && i <= step;
+
+    html += `<div class="rule-step ${cls}">
+      <div class="rule-header">
+        <img class="rule-icon" src="${o.img}" alt="${o.cls}">
+        <span class="rule-name ${o.cls}">${o.name}</span>
+      </div>
+      <div class="rule-detail">Need <strong>${o.need} more</strong> than opponent</div>
+      ${showResult ? `<div class="rule-result ${check.decisive ? 'win' : 'no'}">
+        ${check.decisive ? playerName(check.winner) + ' wins! (' + check.diff + ' more)' : 'Difference: ' + check.diff + (o.type === PUNCH ? ' (tied!)' : ' (not enough)')}
+      </div>` : ''}
+    </div>`;
+
+    // Arrow between steps
+    if (i < 2) {
+      let arrowCls = '';
+      if (isResolving && step >= 0 && r) {
+        const prevDecisive = r.checks.slice(0, i + 1).some(c => c.decisive);
+        if (prevDecisive) arrowCls = 'style="opacity:0.2"';
+      }
+      const arrowText = (isResolving && check && i <= step && !check?.decisive) ? 'No winner, check next...' : 'If no winner...';
+      html += `<div style="text-align:center;color:#555;font-size:0.8em;margin:-4px 0" ${arrowCls}>${arrowText}</div>`;
+    }
+  }
+
+  // Draw
+  const isDraw = game.phase === 'result' && r && !r.winner;
+  const drawPending = isResolving && step >= 0 && r && r.checks.some(c => c.decisive);
+  html += `<div class="rule-draw ${isDraw ? 'checking' : (drawPending ? '' : (isResolving ? 'pending' : ''))}">
+    ${isDraw ? 'No winner on any check &mdash; Draw!' : 'If still no winner &rarr; Draw'}
+  </div>`;
+
+  html += `</div>`;
+  return html;
+}
+
+function renderResult() {
+  const r = game.battleResult;
+  if (!r) return '';
+
+  let html = `<div class="reveal-area">`;
+  if (r.winner) {
+    html += `<div class="reveal-result ${r.winner}win">${playerName(r.winner)} wins the battle!</div>`;
+    const loser = otherPlayer(r.winner);
+    const lp = getPlayer(loser);
+    const nzLoss = lp.neutralZone;
+    html += `<p style="color:#aaa;margin-bottom:12px">${playerName(loser)} loses 1 meeple${nzLoss > 0 ? ' + ' + nzLoss + ' from Neutral Zone' : ''}</p>`;
+  } else {
+    html += `<div class="reveal-result draw">Draw!</div>`;
+    html += `<p style="color:#aaa;margin-bottom:12px">Both players send 1 meeple to the Neutral Zone</p>`;
+  }
+  html += `<button class="start-btn" onclick="applyResult()">Continue</button>`;
+  html += `</div>`;
+  return html;
+}
+
+function renderGameOver() {
+  const w = game.winner;
+  return `<div class="game-over ${w}">
+    <h1>${playerName(w)} Wins!</h1>
+    <p>${playerName(otherPlayer(w))} has lost 6 meeples.</p>
+    <p style="color:#666">Game lasted ${game.battleNumber} battles.</p>
+    <button class="start-btn" style="margin-top:24px" onclick="game=null; render()">Play Again</button>
+  </div>`;
+}
+
+function renderOverlay() {
+  if (!game.overlay) return;
+  const ov = game.overlay;
+  const div = document.createElement('div');
+  div.className = `overlay ${ov.player}`;
+  if (ov.type === 'handoff') {
+    div.innerHTML = `<h2>${playerName(ov.player)}'s Turn</h2>
+      <p>Pass the device to ${playerName(ov.player)}</p>
+      <p style="font-size:0.85em; color:#666">The other player's meeples are hidden.</p>
+      <button class="start-btn" onclick="dismissOverlay()">Ready</button>`;
+  }
+  document.body.appendChild(div);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+window._p1Type = 'human';
+window._p2Type = 'ai';
+render();
+</script>
+</body>
+</html>
