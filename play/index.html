@@ -27,6 +27,8 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
 .toggle-btn:hover { background: #4a90d9; color: #fff; }
 .toggle-btn.ai { border-color: #e94560; color: #e94560; }
 .toggle-btn.ai:hover { background: #e94560; color: #fff; }
+.toggle-btn.dice { border-color: #9c88ff; color: #9c88ff; }
+.toggle-btn.dice:hover { background: #9c88ff; color: #fff; }
 .start-btn { background: linear-gradient(135deg, #4a90d9, #e94560); border: none; color: #fff; padding: 14px 48px; border-radius: 10px; cursor: pointer; font-size: 1.2em; font-weight: bold; transition: transform 0.2s, box-shadow 0.2s; }
 .start-btn:hover { transform: scale(1.05); box-shadow: 0 4px 20px rgba(74,144,217,0.4); }
 
@@ -254,11 +256,21 @@ function getPlayer(id) { return game[id]; }
 function otherPlayer(id) { return id === 'p1' ? 'p2' : 'p1'; }
 function playerName(id) { return id === 'p1' ? 'Player 1' : 'Player 2'; }
 function playerColor(id) { return id === 'p1' ? '#4a90d9' : '#d94a5a'; }
+function playerTypeLabel(type) { return type === 'ai' ? '(AI)' : type === 'dice' ? '(Dice)' : ''; }
 function remaining(p) { return 8 - p.casualties - p.neutralZone; }
-function getActions(p) { return p.casualties >= 6 ? 0 : ACTIONS_TABLE[p.casualties]; }
+function getActions(p) {
+  if (p.type === 'dice') return 0;
+  return p.casualties >= 6 ? 0 : ACTIONS_TABLE[p.casualties];
+}
 function getPickCount() {
   const maxCas = Math.max(game.p1.casualties, game.p2.casualties);
   return maxCas >= 6 ? 0 : PICK_TABLE[maxCas];
+}
+function cycleType(pidKey) {
+  const cur = window[pidKey] || (pidKey === '_p1Type' ? 'human' : 'ai');
+  const next = { human: 'ai', ai: 'dice', dice: 'human' };
+  window[pidKey] = next[cur];
+  render();
 }
 
 function sortMeeples(meeples) {
@@ -401,10 +413,18 @@ function combinations(n, k) {
 // ============================================================
 function startBattle() {
   const p1 = game.p1, p2 = game.p2;
-  p1.meeples = rollMeeples(remaining(p1));
-  p2.meeples = rollMeeples(remaining(p2));
-  p1.picks = [];
-  p2.picks = [];
+  const pickCount = getPickCount();
+  for (const p of [p1, p2]) {
+    if (p.type === 'dice') {
+      // Dice side rolls exactly pickCount meeples (or all remaining if fewer), reveals all.
+      const n = Math.min(pickCount, remaining(p));
+      p.meeples = rollMeeples(n);
+      p.picks = [...p.meeples];
+    } else {
+      p.meeples = rollMeeples(remaining(p));
+      p.picks = [];
+    }
+  }
   game.selectedIndices = new Set();
   game.repositionIndex = null;
   game.rerollingIndices = null;
@@ -422,6 +442,12 @@ function beginPlayerTurn(pid) {
   const actions = getActions(p);
   game.actionsRemaining = actions;
   game.totalActions = actions;
+
+  if (p.type === 'dice') {
+    // Dice side has already rolled and "picked" in startBattle — skip directly.
+    finishPlayerTurn(pid);
+    return;
+  }
 
   if (p.type === 'ai') {
     game.phase = 'action';
@@ -720,26 +746,28 @@ function render() {
 }
 
 function renderSetup() {
+  const p1 = window._p1Type || 'human';
+  const p2 = window._p2Type || 'ai';
+  const label = t => t === 'human' ? 'Human' : t === 'ai' ? 'AI' : 'Dice';
+  const cls   = t => t === 'ai' ? 'ai' : t === 'dice' ? 'dice' : '';
+  const isSolo = p1 === 'dice' || p2 === 'dice';
   return `<div class="setup">
     <h1>Meeple Melee</h1>
     <p class="subtitle">A head-to-head meeple combat game</p>
     <div class="setup-row">
       <div class="setup-player p1">
         <h3>Player 1 (Blue)</h3>
-        <button class="toggle-btn ${window._p1Type === 'ai' ? 'ai' : ''}"
-                onclick="window._p1Type = window._p1Type === 'ai' ? 'human' : 'ai'; render()">
-          ${(window._p1Type || 'human') === 'human' ? 'Human' : 'AI'}
-        </button>
+        <button class="toggle-btn ${cls(p1)}" onclick="cycleType('_p1Type')">${label(p1)}</button>
       </div>
       <div class="setup-player p2">
         <h3>Player 2 (Red)</h3>
-        <button class="toggle-btn ${window._p2Type === 'ai' ? 'ai' : ''}"
-                onclick="window._p2Type = window._p2Type === 'ai' ? 'human' : 'ai'; render()">
-          ${(window._p2Type || 'ai') === 'human' ? 'Human' : 'AI'}
-        </button>
+        <button class="toggle-btn ${cls(p2)}" onclick="cycleType('_p2Type')">${label(p2)}</button>
       </div>
     </div>
-    <button class="start-btn" onclick="newGame(window._p1Type||'human', window._p2Type||'ai'); render()">Start Game</button>
+    ${isSolo ? `<p style="color:#9c88ff;margin-bottom:24px;font-size:0.95em">
+      Solo mode — the Dice side rolls only what the other player reveals, takes no actions, and reveals all rolled meeples.
+    </p>` : ''}
+    <button class="start-btn" onclick="newGame('${p1}', '${p2}'); render()">Start Game</button>
     <div class="rules-link" style="margin-top:24px"><a href="../MeepleMeleeRules.pdf" target="_blank">Read the Rules (PDF)</a></div>
   </div>`;
 }
@@ -771,7 +799,7 @@ function renderPlayerArea(pid) {
 
   let html = `<div class="player-area ${pid} ${isActive ? 'active' : ''} ${outcomeClass}">`;
   html += `<div class="player-header">
-    <span class="player-name ${pid}">${playerName(pid)} ${p.type === 'ai' ? '(AI)' : ''}</span>
+    <span class="player-name ${pid}">${playerName(pid)} ${playerTypeLabel(p.type)}</span>
     <span class="player-info">Meeples: ${remaining(p)} | Casualties: ${p.casualties}${p.neutralZone > 0 ? ' | NZ: ' + p.neutralZone : ''}</span>
   </div>`;
 
