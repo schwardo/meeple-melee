@@ -204,6 +204,53 @@ body { background: #1a1a2e; color: #e0e0e0; font-family: 'Segoe UI', system-ui, 
 }
 
 .mini-meeple { width: 20px; height: 20px; }
+
+/* Rulebook iconography — pixel-art icons exported from design SVGs (icons/*.png) */
+.ic { width: 1em; height: 1em; vertical-align: -0.15em; display: inline-block; flex-shrink: 0; object-fit: contain; }
+img.ic { filter: invert(1) brightness(0.95); } /* design icons are black; invert for dark theme */
+/* Inline-SVG icons (no PNG): tinted via currentColor */
+.ic-burst { color: #ffd700; }
+.ic-nz { color: #9c88ff; }
+.ic-lg { width: 1.6em; height: 1.6em; }
+.ic-xl { width: 64px; height: 64px; display: block; margin: 0 auto 8px; }
+.ic-sm { width: 0.85em; height: 0.85em; }
+
+/* Phase strip — rulebook's ROLL → ACTION → PICK flow */
+.phase-strip { display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 12px; padding: 8px 12px; background: #16213e; border-radius: 12px; flex-wrap: wrap; }
+.phase-step { display: flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 8px; opacity: 0.3; transition: all 0.3s; }
+.phase-step.active { opacity: 1; background: #0f346088; box-shadow: 0 0 12px #4fc3f733; }
+.phase-step.done { opacity: 0.55; }
+.phase-step .ic { width: 24px; height: 24px; }
+.phase-step .phase-name { font-size: 0.75em; text-transform: uppercase; letter-spacing: 1.5px; color: #ddd; font-weight: bold; }
+.phase-arrow { color: #555; font-size: 1.1em; }
+
+/* Track label icons */
+.track-row-label { display: inline-flex; align-items: center; gap: 3px; font-size: 0.6em; letter-spacing: 0.5px; }
+.track-row-label .ic { width: 14px; height: 14px; }
+.track-burst { display: inline-flex; align-items: center; margin-left: 6px; }
+.track-burst .ic { width: 20px; height: 20px; }
+
+/* Outcome badge on player area after resolution */
+.outcome-badge { display: inline-flex; align-items: center; gap: 4px; font-weight: bold; font-size: 0.85em; padding: 2px 8px; border-radius: 6px; }
+.outcome-badge.win { background: #4caf5022; color: #4caf50; }
+.outcome-badge.lose { background: #f4433622; color: #f44336; }
+.outcome-badge.draw { background: #ffa72622; color: #ffa726; }
+.outcome-badge .ic { width: 18px; height: 18px; }
+
+/* Rules-ref phase flow header */
+.rules-flow { display: flex; align-items: center; justify-content: center; gap: 4px; margin-bottom: 10px; padding-bottom: 10px; border-bottom: 1px solid #2a3550; }
+.rules-flow .flow-step { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 2px 6px; }
+.rules-flow .flow-step .ic { width: 20px; height: 20px; }
+.rules-flow .flow-step span { font-size: 0.55em; text-transform: uppercase; letter-spacing: 0.8px; color: #888; }
+.rules-flow .flow-arrow { color: #444; font-size: 0.9em; }
+
+/* Action token gear */
+.action-token .ic { width: 20px; height: 20px; }
+.action-token.available img.ic { filter: none; } /* dark icon on gold background */
+.action-token.used img.ic { filter: invert(1); opacity: 0.35; }
+
+/* Outcome badge icons should track badge color (invert back to black, then tint via surrounding CSS is messy — keep default white) */
+.outcome-badge img.ic { filter: invert(1) brightness(0.95); }
 </style>
 </head>
 <body>
@@ -223,6 +270,24 @@ const THRESHOLDS = { sweep: 3, kick: 2, punch: 1 };
 
 function miniMeepleSvg(color) {
   return `<svg class="mini-meeple" viewBox="-10 -12 20 24"><path d="${MEEPLE_PATH}" fill="${color}"/></svg>`;
+}
+
+// Rulebook iconography — PNG icons extracted from the original design SVGs
+// (see ../design/screen.svg and ../design/flowchart.svg).
+const PNG_ICONS = new Set(['roll', 'action', 'pick', 'win', 'lose', 'draw', 'fight', 'victory']);
+
+// Inline-SVG fallbacks for icons without a PNG source (Casualty Track end-of-track
+// burst marker; Neutral Zone spiral). Both were added in the modern PDF after the
+// 2019 SVG asset set.
+const ICONS = {
+  burst: '<path d="M12 2L13.5 8L19.5 6L16 11L22 12L16 13L19.5 18L13.5 16L12 22L10.5 16L4.5 18L8 13L2 12L8 11L4.5 6L10.5 8Z" fill="currentColor" stroke="none"/>',
+  nz: '<path d="M13 12a1 1 0 1 0-1 1a2.5 2.5 0 0 0 2.5-2.5a4 4 0 0 0-4-4a5.5 5.5 0 0 0-5.5 5.5a7 7 0 0 0 7 7a8.5 8.5 0 0 0 8.5-8.5"/>',
+};
+
+function icon(kind, cls = '') {
+  const extra = cls ? ' ' + cls : '';
+  if (PNG_ICONS.has(kind)) return `<img class="ic${extra}" src="icons/${kind}.png" alt="${kind}">`;
+  return `<svg class="ic${extra}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ICONS[kind]}</svg>`;
 }
 
 // ============================================================
@@ -902,14 +967,21 @@ function render() {
     const solo = isSoloMode();
     const playerPick = solo ? Math.max(0, base - 1) : base;
     const pickLabel = solo ? `${playerPick} <span style="color:#9c88ff;font-weight:normal">(Dice reveals ${base})</span>` : `${base}`;
-    html += `<div style="text-align:center; padding: 40px 0;">
-      <p style="color:#aaa; margin-bottom: 8px;">Pick: <strong style="color:#fff">${pickLabel}</strong> meeples</p>
-      <p style="color:#aaa; margin-bottom: 8px;">
-        P1 actions: <strong style="color:#4a90d9">${p1Actions}</strong>${p1New ? ' <span style="color:#ffd700">(+1 new!)</span>' : ''}
+    html += `<div style="text-align:center; padding: 32px 0;">
+      <div class="phase-strip" style="margin: 0 auto 24px; display:inline-flex">
+        <div class="phase-step done">${icon('roll', 'ic-roll')}<span class="phase-name">Roll</span></div>
+        <span class="phase-arrow">&rarr;</span>
+        <div class="phase-step done">${icon('action', 'ic-action')}<span class="phase-name">Action</span></div>
+        <span class="phase-arrow">&rarr;</span>
+        <div class="phase-step done">${icon('pick', 'ic-pick')}<span class="phase-name">Pick</span></div>
+      </div>
+      <p style="color:#aaa; margin-bottom: 8px;">${icon('pick', 'ic-pick')} Pick: <strong style="color:#fff">${pickLabel}</strong> meeples</p>
+      <p style="color:#aaa; margin-bottom: 20px;">
+        ${icon('action', 'ic-action')} P1 actions: <strong style="color:#4a90d9">${p1Actions}</strong>${p1New ? ' <span style="color:#ffd700">(+1 new!)</span>' : ''}
         &nbsp;&nbsp;|&nbsp;&nbsp;
-        P2 actions: <strong style="color:#d94a5a">${p2Actions}</strong>${p2New ? ' <span style="color:#ffd700">(+1 new!)</span>' : ''}
+        ${icon('action', 'ic-action')} P2 actions: <strong style="color:#d94a5a">${p2Actions}</strong>${p2New ? ' <span style="color:#ffd700">(+1 new!)</span>' : ''}
       </p>
-      <button class="start-btn" onclick="startBattle()">Fight!</button>
+      <button class="start-btn" onclick="startBattle()">${icon('fight')} Fight!</button>
     </div>`;
     html += renderCenterTrack();
     html += `</div><div class="game-sidebar">${renderRulesRef()}</div></div>`;
@@ -919,6 +991,7 @@ function render() {
 
   html += `<div class="game-layout"><div class="game-main">`;
 
+  html += renderPhaseStrip();
   html += renderPlayerArea('p2');
   html += renderCenterTrack();
   html += renderPlayerArea('p1');
@@ -1001,10 +1074,19 @@ function renderPlayerArea(pid) {
     else outcomeClass = 'battle-draw';
   }
 
+  // Battle outcome badge (WIN/LOSE/DRAW) shown in header when resolved
+  let outcomeBadge = '';
+  if (game.phase === 'result' && game.battleResult) {
+    const w = game.battleResult.winner;
+    if (w === pid) outcomeBadge = `<span class="outcome-badge win">${icon('win')} WIN</span>`;
+    else if (w && w !== pid) outcomeBadge = `<span class="outcome-badge lose">${icon('lose')} LOSE</span>`;
+    else outcomeBadge = `<span class="outcome-badge draw">${icon('draw')} DRAW</span>`;
+  }
+
   let html = `<div class="player-area ${pid} ${isActive ? 'active' : ''} ${outcomeClass}">`;
   html += `<div class="player-header">
-    <span class="player-name ${pid}">${playerName(pid)} ${playerTypeLabel(p.type)}</span>
-    <span class="player-info">Meeples: ${remaining(p)} | Casualties: ${p.casualties}${p.neutralZone > 0 ? ' | NZ: ' + p.neutralZone : ''}</span>
+    <span class="player-name ${pid}">${playerName(pid)} ${playerTypeLabel(p.type)} ${outcomeBadge}</span>
+    <span class="player-info">Meeples: ${remaining(p)} | Casualties: ${p.casualties}${p.neutralZone > 0 ? ` | ${icon('nz', 'ic-nz')} ${p.neutralZone}` : ''}</span>
   </div>`;
 
   if (showPicks) {
@@ -1061,32 +1143,55 @@ function renderMeeple(orientation, pid, idx, selectable, selected, dimmed, click
   </div>`;
 }
 
+function renderPhaseStrip() {
+  const phase = game.phase;
+  if (phase === 'battle-start' || phase === 'resolving' || phase === 'result') return '';
+  const steps = [
+    { key: 'rolling', icon: 'roll', name: 'Roll', cls: 'ic-roll' },
+    { key: 'action',  icon: 'action', name: 'Action', cls: 'ic-action' },
+    { key: 'pick',    icon: 'pick', name: 'Pick', cls: 'ic-pick' },
+  ];
+  const order = { rolling: 0, action: 1, pick: 2 };
+  const curIdx = order[phase] ?? -1;
+  let html = `<div class="phase-strip">`;
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    const cls = i === curIdx ? 'active' : (i < curIdx ? 'done' : '');
+    html += `<div class="phase-step ${cls}">${icon(s.icon, s.cls)}<span class="phase-name">${s.name}</span></div>`;
+    if (i < steps.length - 1) html += `<span class="phase-arrow">&rarr;</span>`;
+  }
+  html += `</div>`;
+  return html;
+}
+
 function renderCenterTrack() {
   let html = `<div class="center-track">`;
-  html += `<div class="casualty-section"><h4>Casualty Track</h4>`;
+  html += `<div class="casualty-section"><h4>Casualty Track ${icon('burst', 'ic-burst ic-sm')}</h4>`;
 
   html += `<div class="casualty-row">`;
-  html += `<div style="width:36px;font-size:0.6em;color:#d94a5a;display:flex;align-items:center;justify-content:center">P2</div>`;
+  html += `<div class="track-row-label" style="width:36px;color:#d94a5a;justify-content:center">${icon('action')}P2</div>`;
   for (let i = 0; i < 6; i++) {
     const filled = i < game.p2.casualties;
     html += `<div class="casualty-slot ${filled ? 'filled p2' : 'empty'}">
       ${filled ? miniMeepleSvg('#d94a5a') : '<span style="color:#555">' + ACTIONS_TABLE[i] + '</span>'}
     </div>`;
   }
+  html += `<div class="track-burst">${game.p2.casualties >= 6 ? icon('burst', 'ic-burst') : ''}</div>`;
   html += `</div>`;
 
   html += `<div class="casualty-row">`;
-  html += `<div style="width:36px;font-size:0.6em;color:#4a90d9;display:flex;align-items:center;justify-content:center">P1</div>`;
+  html += `<div class="track-row-label" style="width:36px;color:#4a90d9;justify-content:center">${icon('action')}P1</div>`;
   for (let i = 0; i < 6; i++) {
     const filled = i < game.p1.casualties;
     html += `<div class="casualty-slot ${filled ? 'filled p1' : 'empty'}">
       ${filled ? miniMeepleSvg('#4a90d9') : '<span style="color:#555">' + ACTIONS_TABLE[i] + '</span>'}
     </div>`;
   }
+  html += `<div class="track-burst">${game.p1.casualties >= 6 ? icon('burst', 'ic-burst') : ''}</div>`;
   html += `</div>`;
 
   html += `<div class="pick-row">`;
-  html += `<div style="width:36px;font-size:0.55em;color:#888;display:flex;align-items:center;justify-content:center">Pick</div>`;
+  html += `<div class="track-row-label" style="width:36px;color:#888;justify-content:center">${icon('pick')}Pick</div>`;
   for (let i = 0; i < 6; i++) {
     const maxCas = Math.max(game.p1.casualties, game.p2.casualties);
     const isActive = i === maxCas && maxCas < 6;
@@ -1094,7 +1199,7 @@ function renderCenterTrack() {
   }
   html += `</div></div>`;
 
-  html += `<div class="neutral-section"><h4>Neutral Zone</h4>
+  html += `<div class="neutral-section"><h4>${icon('nz', 'ic-nz')} Neutral Zone</h4>
     <div class="nz-counts">
       <div class="nz-count">${miniMeepleSvg('#4a90d9')} ${game.p1.neutralZone}</div>
       <div class="nz-count">${miniMeepleSvg('#d94a5a')} ${game.p2.neutralZone}</div>
@@ -1116,7 +1221,7 @@ function renderActionsBar() {
     html += `<div class="actions-tokens">`;
     for (let i = 0; i < game.totalActions; i++) {
       const available = i < game.actionsRemaining;
-      html += `<div class="action-token ${available ? 'available' : 'used'}">${available ? '!' : ''}</div>`;
+      html += `<div class="action-token ${available ? 'available' : 'used'}">${icon('action')}</div>`;
     }
     html += `</div>`;
     html += `<div class="actions-info">
@@ -1136,8 +1241,8 @@ function renderActionsBar() {
       html += `<button class="action-btn done" onclick="cancelReposition()" style="padding:6px 12px">Cancel</button></div>`;
     } else if (!game.rerollingIndices) {
       const sel = game.selectedIndices.size;
-      html += `<button class="action-btn reroll" ${sel === 0 ? 'disabled' : ''} onclick="doReroll()">Reroll${sel > 0 ? ' (' + sel + ')' : ''}</button>`;
-      html += `<button class="action-btn reposition" ${sel !== 1 ? 'disabled' : ''} onclick="startReposition()">Reposition${sel === 1 ? '' : ' (select 1)'}</button>`;
+      html += `<button class="action-btn reroll" ${sel === 0 ? 'disabled' : ''} onclick="doReroll()">${icon('roll')} Reroll${sel > 0 ? ' (' + sel + ')' : ''}</button>`;
+      html += `<button class="action-btn reposition" ${sel !== 1 ? 'disabled' : ''} onclick="startReposition()">${icon('pick')} Reposition${sel === 1 ? '' : ' (select 1)'}</button>`;
       if (sel === pickCount) {
         html += `<button class="action-btn confirm" onclick="skipAndConfirm()">Skip Actions, Confirm Selection</button>`;
       }
@@ -1165,7 +1270,15 @@ function renderRulesRef() {
   const r = game.battleResult;
   const step = game.resolveStep;
 
-  let html = `<div class="rules-ref"><h3>Battle Resolution</h3>`;
+  let html = `<div class="rules-ref">
+    <div class="rules-flow">
+      <div class="flow-step">${icon('roll', 'ic-roll')}<span>Roll</span></div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">${icon('action', 'ic-action')}<span>Action</span></div>
+      <div class="flow-arrow">&rarr;</div>
+      <div class="flow-step">${icon('pick', 'ic-pick')}<span>Pick</span></div>
+    </div>
+    <h3>Battle Resolution</h3>`;
 
   const orientations = [
     { type: SWEEP, name: 'Sweep', cls: 'sweep', img: 'sweep.png', need: 3 },
@@ -1252,14 +1365,16 @@ function renderResult() {
 
   let html = `<div class="reveal-area">`;
   if (r.winner) {
-    html += `<div class="reveal-result ${r.winner}win">${playerName(r.winner)} wins the battle!</div>`;
+    html += icon('win', 'ic-xl ic-win');
+    html += `<div class="reveal-result ${r.winner}win">WIN &mdash; ${playerName(r.winner)} wins the battle!</div>`;
     const loser = otherPlayer(r.winner);
     const lp = getPlayer(loser);
     const nzLoss = lp.neutralZone;
-    html += `<p style="color:#aaa;margin-bottom:12px">${playerName(loser)} loses 1 meeple${nzLoss > 0 ? ' + ' + nzLoss + ' from Neutral Zone' : ''}</p>`;
+    html += `<p style="color:#aaa;margin-bottom:12px">${icon('lose', 'ic-lose')} ${playerName(loser)} places 1 meeple on the Casualty Track${nzLoss > 0 ? ` (plus ${nzLoss} from the Neutral Zone ${icon('nz', 'ic-nz ic-sm')})` : ''}</p>`;
   } else {
-    html += `<div class="reveal-result draw">Draw!</div>`;
-    html += `<p style="color:#aaa;margin-bottom:12px">Both players send 1 meeple to the Neutral Zone</p>`;
+    html += icon('draw', 'ic-xl ic-draw');
+    html += `<div class="reveal-result draw">DRAW</div>`;
+    html += `<p style="color:#aaa;margin-bottom:12px">Both players place 1 meeple in the Neutral Zone ${icon('nz', 'ic-nz ic-sm')}</p>`;
   }
   html += `<button class="start-btn" onclick="applyResult()">Continue</button>`;
   html += `</div>`;
@@ -1269,8 +1384,9 @@ function renderResult() {
 function renderGameOver() {
   const w = game.winner;
   return `<div class="game-over ${w}">
+    ${icon('victory', 'ic-xl')}
     <h1>${playerName(w)} Wins!</h1>
-    <p>${playerName(otherPlayer(w))} has lost 6 meeples.</p>
+    <p>${playerName(otherPlayer(w))} has lost 6 meeples ${icon('burst', 'ic-burst ic-sm')}</p>
     <p style="color:#666">Game lasted ${game.battleNumber} battles.</p>
     <button class="start-btn" style="margin-top:24px" onclick="game=null; render()">Play Again</button>
   </div>`;
